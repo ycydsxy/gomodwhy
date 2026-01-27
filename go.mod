@@ -1,4 +1,4 @@
-module code.byted.org/suxiangyu/gomodwhy
+module github.com/ycydsxy/gomodwhy
 
 go 1.16
 
