@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
 
 	"github.com/jessevdk/go-flags"
@@ -69,86 +71,134 @@ func buildForward(packages []Package, includeTest bool) map[string][]string {
 	return forward
 }
 
-func allPaths(from string, to string, forward map[string][]string) [][]string {
-	// Build reverse dependency graph, search up from target package
-	reverseMap := make(map[string][]string)
-	for u, vs := range forward {
-		for _, v := range vs {
-			reverseMap[v] = append(reverseMap[v], u)
+func hasCycle(path []string, node string) bool {
+	for _, n := range path {
+		if n == node {
+			return true
 		}
 	}
+	return false
+}
 
-	// Use BFS to search up from target package
-	var paths [][]string
-	queue := [][]string{{to}}
+func mergePaths(fromPath []string, toPath []string) []string {
+	merged := make([]string, len(fromPath)+len(toPath))
+	copy(merged, fromPath)
+	for i := 0; i < len(toPath); i++ {
+		merged[len(fromPath)+i] = toPath[i]
+	}
+	return merged
+}
 
-	for len(queue) > 0 {
-		currentPath := queue[0]
-		queue = queue[1:]
-
-		lastNode := currentPath[0]
-
-		// If reached the starting point, reverse path and add to results
-		if lastNode == from {
-			reversedPath := make([]string, len(currentPath))
-			for i, node := range currentPath {
-				reversedPath[len(currentPath)-1-i] = node
-			}
-			paths = append(paths, reversedPath)
+func trimAndUnique(paths [][]string, depth int) [][]string {
+	set := make(map[string]struct{})
+	res := make([][]string, 0)
+	for _, path := range paths {
+		if len(path) >= depth+1 {
+			path = path[:depth+1]
+		}
+		key := strings.Join(path, "->")
+		if _, ok := set[key]; ok {
 			continue
 		}
+		set[key] = struct{}{}
+		res = append(res, path)
+	}
+	return res
+}
 
-		// Iterate through all possible predecessor nodes
-		for _, prev := range reverseMap[lastNode] {
-			// Check if path already contains this node to avoid cycles
-			duplicate := false
-			for _, node := range currentPath {
-				if node == prev {
-					duplicate = true
-					break
-				}
-			}
-			if duplicate {
-				continue
-			}
+func reversePaths(paths [][]string) [][]string {
+	reversed := make([][]string, 0, len(paths))
+	for _, reversedPath := range paths {
+		path := make([]string, 0, len(reversedPath))
+		for i := len(reversedPath) - 1; i >= 0; i-- {
+			path = append(path, reversedPath[i])
+		}
+		reversed = append(reversed, path)
+	}
+	return reversed
+}
 
-			// Create new path and add to queue
-			newPath := make([]string, len(currentPath)+1)
-			newPath[0] = prev
-			copy(newPath[1:], currentPath)
-			queue = append(queue, newPath)
+func allPaths(start string, end string, forward map[string][]string, depth int) [][]string {
+	if depth <= 0 {
+		depth = math.MaxInt32
+	}
+
+	// Build reversed graph
+	reversedMap := make(map[string][]string)
+	for k, v := range forward {
+		for _, next := range v {
+			reversedMap[next] = append(reversedMap[next], k)
 		}
 	}
+
+	// Find all paths from end to start in reversed graph
+	paths := doAllPaths(end, start, reversedMap, depth, map[string]*depthCache{})
+
+	// Reverse paths to get from start to end
+	paths = reversePaths(paths)
+
+	// Sort paths by length and lexicographically
+	sort.Slice(paths, func(i, j int) bool {
+		if len(paths[i]) != len(paths[j]) {
+			return len(paths[i]) < len(paths[j])
+		}
+		return strings.Join(paths[i], "->") < strings.Join(paths[j], "->")
+	})
 
 	return paths
 }
 
-func uniquePaths(paths [][]string) [][]string {
-	seen := make(map[string]bool)
-	var out [][]string
-	for _, p := range paths {
-		k := strings.Join(p, "->")
-		if !seen[k] {
-			seen[k] = true
-			out = append(out, p)
-		}
-	}
-	return out
+type depthCache struct {
+	depth int
+	paths [][]string
 }
 
-func handleDepth(paths [][]string, depth int) [][]string {
-	if depth <= 0 {
+func (c *depthCache) get(depth int) ([][]string, bool) {
+	if c == nil || depth > c.depth {
+		return nil, false
+	}
+	return trimAndUnique(c.paths, depth), true
+}
+
+func (c *depthCache) put(depth int, paths [][]string) {
+	if depth <= c.depth {
+		return
+	}
+	c.depth = depth
+	c.paths = paths
+}
+
+// doAllPaths returns all paths from start to end in forward graph.
+// Note: There is a premise that any path from the `start` node will eventually reach the `end` node.
+func doAllPaths(start string, end string, forward map[string][]string, depthLeft int, cache map[string]*depthCache) [][]string {
+	if start == end || depthLeft <= 0 {
+		return [][]string{{start}}
+	}
+	if len(forward[start]) == 0 {
+		return nil
+	}
+	if paths, ok := cache[start].get(depthLeft); ok {
 		return paths
 	}
-	var out [][]string
-	for _, p := range paths {
-		if len(p) <= depth {
-			out = append(out, p)
-		} else {
-			out = append(out, p[:depth+1])
+	res := make([][]string, 0)
+	for _, next := range forward[start] {
+		paths := doAllPaths(next, end, forward, depthLeft-1, cache)
+		var pathsToAppend [][]string
+		for _, path := range paths {
+			if hasCycle(path, start) {
+				continue
+			}
+			pathsToAppend = append(pathsToAppend, mergePaths([]string{start}, path))
 		}
+		res = append(res, pathsToAppend...)
 	}
-	return out
+
+	if cache[start] == nil {
+		cache[start] = new(depthCache)
+	}
+	cache[start].put(depthLeft, res)
+
+	return res
 }
 
 func printPaths(target string, paths [][]string) {
@@ -158,8 +208,8 @@ func printPaths(target string, paths [][]string) {
 		return
 	}
 	for _, p := range paths {
-		for i := len(p) - 1; i >= 0; i-- {
-			fmt.Println(p[i])
+		for _, item := range p {
+			fmt.Println(item)
 		}
 		fmt.Println()
 	}
@@ -211,14 +261,11 @@ func main() {
 	root := packages[len(packages)-1].ImportPath // go list use post-order traversal
 
 	opts.Printf("Building dependency graph...\n")
-	forward := buildForward(packages, opts.IncludeTest)
+	forwardMap := buildForward(packages, opts.IncludeTest)
 	opts.Printf("Dependency graph built successfully\n")
 
 	opts.Printf("Analyzing dependency paths...\n")
-	paths := allPaths(root, targetPkg, forward)
-	paths = handleDepth(paths, opts.Depth)
-	paths = uniquePaths(paths)
-
-	opts.Printf("Analysis completed, found %d dependency paths\n\n", len(paths))
+	paths := allPaths(root, targetPkg, forwardMap, opts.Depth)
+	opts.Printf("Successfully analyzed %d dependency paths\n\n", len(paths))
 	printPaths(targetPkg, paths)
 }
