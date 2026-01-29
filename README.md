@@ -42,18 +42,18 @@ gomodwhy [options] <target-pkg>
 ```bash
 gomodwhy fmt
 # fmt
-code.byted.org/suxiangyu/gomodwhy
+github.com/ycydsxy/gomodwhy
 fmt
 
-code.byted.org/suxiangyu/gomodwhy
+github.com/ycydsxy/gomodwhy
 encoding/json
 fmt
 
-code.byted.org/suxiangyu/gomodwhy
+github.com/ycydsxy/gomodwhy
 github.com/jessevdk/go-flags
 fmt
 
-code.byted.org/suxiangyu/gomodwhy
+github.com/ycydsxy/gomodwhy
 github.com/jessevdk/go-flags
 golang.org/x/sys/unix
 fmt
@@ -64,13 +64,13 @@ fmt
 ```bash
 gomodwhy -d 1 fmt
 # fmt
-code.byted.org/suxiangyu/gomodwhy
+encoding/json
 fmt
 
 github.com/jessevdk/go-flags
 fmt
 
-encoding/json
+github.com/ycydsxy/gomodwhy
 fmt
 
 golang.org/x/sys/unix
@@ -95,25 +95,25 @@ fmt
 ```bash
 gomodwhy -v fmt
 Executing go list command to get dependency information...
-Successfully got dependency information for 72 packages
+Successfully got dependency information for 69 packages
 Building dependency graph...
 Dependency graph built successfully
 Analyzing dependency paths...
-Analysis completed, found 4 dependency paths
+Successfully analyzed 4 dependency paths
 
 # fmt
-code.byted.org/suxiangyu/gomodwhy
+github.com/ycydsxy/gomodwhy
 fmt
 
-code.byted.org/suxiangyu/gomodwhy
-github.com/jessevdk/go-flags
-fmt
-
-code.byted.org/suxiangyu/gomodwhy
+github.com/ycydsxy/gomodwhy
 encoding/json
 fmt
 
-code.byted.org/suxiangyu/gomodwhy
+github.com/ycydsxy/gomodwhy
+github.com/jessevdk/go-flags
+fmt
+
+github.com/ycydsxy/gomodwhy
 github.com/jessevdk/go-flags
 golang.org/x/sys/unix
 fmt
@@ -122,10 +122,10 @@ fmt
 #### Include test dependencies
 
 ```bash
-gomodwhy -t github.com/stretchr/testify
-# github.com/stretchr/testify
-code.byted.org/suxiangyu/gomodwhy
-github.com/stretchr/testify
+gomodwhy -t crypto/sha256
+# crypto/sha256
+github.com/ycydsxy/gomodwhy
+crypto/sha256
 ```
 
 ## How it works
